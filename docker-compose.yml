@@ -1,0 +1,60 @@
+version: '3.2'
+services:
+  sonarqube:
+    build:
+      context: sonarqube/
+    ports:
+      - 9000:9000
+      - 9092:9092
+    container_name: sonarqube
+
+  app-server:
+    # Configuration for building the docker image for the backend service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8086:8086" # Forward the exposed port 8080 on the container to port 8080 on the host machine
+    restart: always
+    depends_on: 
+      - mysql # This service depends on mysql. Start that first.
+    environment: # Pass environment variables to the service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/full-stack-ecommerce?useSSL=false&useUnicode=yes&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ecommerceapp
+      SPRING_DATASOURCE_PASSWORD: ecommerceapp  
+    networks: # Networks to join (Services on the same network can communicate with each other using their name)
+      - myecommercenetwork
+  
+  
+  mysql:
+    build: 
+      context: db-scripts/
+    ports: 
+      - 3306:3306
+    environment: 
+      MYSQL_ROOT_PASSWORD: root
+    volumes: 
+      - db-data:/var/lib/mysql
+    container_name: mysql
+    networks: 
+      - myecommercenetwork
+
+  jenkins:
+    build:
+      context: jenkins/
+    privileged: true
+    user: root
+    ports:
+      - 8080:8080
+      - 50000:50000
+    container_name: jenkins
+    volumes:
+      - /tmp/jenkins:/var/jenkins_home #Remember that, the tmp directory is designed to be wiped on system reboot.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - sonarqube
+volumes: 
+  db-data:
+networks: 
+  myecommercenetwork:
+    driver: bridge
